@@ -58,87 +58,122 @@ func (vm *VM) Run() error {
 		op := code.OpCode(vm.instructions[ip])
 
 		switch op {
-			case code.OpConstant:
-				constIndex := code.ReadUint16(vm.instructions[ip+1:])
-				ip += 2
+		case code.OpConstant:
+			constIndex := code.ReadUint16(vm.instructions[ip+1:])
+			ip += 2
 
-				err := vm.push(vm.constants[constIndex])
-				if err != nil {
-					return err
-				}
+			err := vm.push(vm.constants[constIndex])
+			if err != nil {
+				return err
+			}
 
-			case code.OpAdd, code.OpSub, code.OpMul, code.OpDiv:
-				err := vm.executeBinaryOperation(op)
-				if err != nil {
-					return err
-				}
+		case code.OpAdd, code.OpSub, code.OpMul, code.OpDiv:
+			err := vm.executeBinaryOperation(op)
+			if err != nil {
+				return err
+			}
 
-			case code.OpEqual, code.OpNotEqual, code.OpGreaterThan:
-				err := vm.executeComparison(op)
-				if err != nil {
-					return err
-				}
+		case code.OpEqual, code.OpNotEqual, code.OpGreaterThan:
+			err := vm.executeComparison(op)
+			if err != nil {
+				return err
+			}
 
-			case code.OpPop:
-				vm.pop()
+		case code.OpPop:
+			vm.pop()
 
-			case code.OpTrue:
-				err := vm.push(True)
-				if err != nil {
-					return err
-				}
+		case code.OpTrue:
+			err := vm.push(True)
+			if err != nil {
+				return err
+			}
 
-			case code.OpFalse:
-				err := vm.push(False)
-				if err != nil {
-					return err
-				}
+		case code.OpFalse:
+			err := vm.push(False)
+			if err != nil {
+				return err
+			}
 
-			case code.OpBang:
-				err := vm.executeBangOperator()
-				if err != nil {
-					return err
-				}
+		case code.OpBang:
+			err := vm.executeBangOperator()
+			if err != nil {
+				return err
+			}
 
-			case code.OpMinus:
-				err := vm.executeMinusOperator()
-				if err != nil {
-					return err
-				}
+		case code.OpMinus:
+			err := vm.executeMinusOperator()
+			if err != nil {
+				return err
+			}
 
-			case code.OpJump:
-				pos := int(code.ReadUint16(vm.instructions[ip+1:]))
+		case code.OpJump:
+			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
+			ip = pos - 1
+
+		case code.OpJumpNotTruthy:
+			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
+			ip += 2
+
+			condition := vm.pop()
+			if !isTruthy(condition) {
 				ip = pos - 1
+			}
 
-			case code.OpJumpNotTruthy:
-				pos := int(code.ReadUint16(vm.instructions[ip+1:]))
-				ip += 2
+		case code.OpNull:
+			err := vm.push(Null)
+			if err != nil {
+				return err
+			}
 
-				condition := vm.pop()
-				if !isTruthy(condition) {
-					ip = pos - 1
-				}
+		case code.OpSetGlobal:
+			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
+			ip += 2
 
-			case code.OpNull:
-				err := vm.push(Null)
-				if err != nil {
-					return err
-				}
+			vm.globals[globalIndex] = vm.pop()
 
-			case code.OpSetGlobal:
-				globalIndex := code.ReadUint16(vm.instructions[ip+1:])
-				ip += 2
+		case code.OpGetGlobal:
+			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
+			ip += 2
 
-				vm.globals[globalIndex] = vm.pop()
+			err := vm.push(vm.globals[globalIndex])
+			if err != nil {
+				return err
+			}
 
-			case code.OpGetGlobal:
-				globalIndex := code.ReadUint16(vm.instructions[ip+1:])
-				ip += 2
+		case code.OpArray:
+			numElements := int(code.ReadUint16(vm.instructions[ip+1:]))
+			ip += 2
 
-				err := vm.push(vm.globals[globalIndex])
-				if err != nil {
-					return err
-				}
+			array := vm.buildArray(vm.sp - numElements, vm.sp)
+			vm.sp = vm.sp - numElements
+			err := vm.push(array)
+			if err != nil {
+				return err
+			}
+
+		case code.OpHash:
+			numElements := int(code.ReadUint16(vm.instructions[ip+1:]))
+			ip += 2
+
+			hash, err := vm.buildHash(vm.sp - numElements, vm.sp)
+			if err != nil {
+				return err
+			}
+			vm.sp = vm.sp - numElements
+
+			err = vm.push(hash)
+			if err != nil {
+				return err
+			}
+
+		case code.OpIndex:
+			index := vm.pop()
+			left := vm.pop()
+
+			err := vm.executeIndexExpression(left, index)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -156,11 +191,16 @@ func (vm *VM) executeBinaryOperation(op code.OpCode) error {
 	leftType := left.Type()
 	rightType := right.Type()
 
-	if leftType == object.INTEGER_OBJ && rightType == object.INTEGER_OBJ {
+	switch {
+	case leftType == object.INTEGER_OBJ && rightType == object.INTEGER_OBJ:
 		return vm.executeBinaryIntegerOperation(op, left, right)
-	}
 
-	return fmt.Errorf("unsupported types for binary operation: %s %s", leftType, rightType)
+	case leftType == object.STRING_OBJ && rightType == object.STRING_OBJ:
+		return vm.executeBinaryStringOperation(op, left, right)
+
+	default:
+		return fmt.Errorf("unsupported types for binary operation: %s %s", leftType, rightType)
+	}
 }
 
 func (vm *VM) executeBinaryIntegerOperation(op code.OpCode, left object.Object, right object.Object) error {
@@ -187,6 +227,88 @@ func (vm *VM) executeBinaryIntegerOperation(op code.OpCode, left object.Object, 
 	}
 
 	return vm.push(&object.Integer{Value: result})
+}
+
+func (vm *VM) executeIndexExpression(left object.Object, index object.Object) error {
+	switch {
+	case left.Type() == object.ARRAY_OBJ && index.Type() == object.INTEGER_OBJ:
+		return vm.executeArrayIndex(left, index)
+
+	case left.Type() == object.HASH_OBJ:
+		return vm.executeHashIndex(left, index)
+
+	default:
+		return fmt.Errorf("index operator not supported: %s", left.Type())
+	}
+}
+
+func (vm *VM) executeArrayIndex(array object.Object, index object.Object) error {
+	arrayObject := array.(*object.Array)
+	i := index.(*object.Integer).Value
+	max := int64(len(arrayObject.Elements) - 1)
+
+	if i < 0 || i > max {
+		return vm.push(Null)
+	}
+
+	return vm.push(arrayObject.Elements[i])
+}
+
+func (vm *VM) executeHashIndex(hash object.Object, index object.Object) error {
+	hashObject := hash.(*object.Hash)
+
+	key, ok := index.(object.Hashable)
+	if !ok {
+		return fmt.Errorf("unusable as hash key: %s", index.Type())
+	}
+
+	pair, ok := hashObject.Pairs[key.HashKey()]
+	if !ok {
+		return vm.push(Null)
+	}
+
+	return vm.push(pair.Value)
+}
+
+func (vm *VM) buildArray(startIndex int, endIndex int) object.Object {
+	elements := make([]object.Object, endIndex - startIndex)
+
+	for i := startIndex; i < endIndex; i++ {
+		elements[i-startIndex] = vm.stack[i]
+	}
+
+	return &object.Array{Elements: elements}
+}
+
+func (vm *VM) buildHash(startIndex int, endIndex int) (object.Object, error) {
+	hashedPairs := make(map[object.HashKey]object.HashPair)
+
+	for i := startIndex; i < endIndex; i += 2 {
+		key := vm.stack[i]
+		value := vm.stack[i+1]
+
+		pair := object.HashPair{Key: key, Value: value}
+
+		hashKey, ok := key.(object.Hashable)
+		if !ok {
+			return nil, fmt.Errorf("unusable as hash key: %s", key.Type())
+		}
+
+		hashedPairs[hashKey.HashKey()] = pair
+	}
+
+	return &object.Hash{Pairs: hashedPairs}, nil
+}
+
+func (vm *VM) executeBinaryStringOperation(op code.OpCode, left object.Object, right object.Object) error {
+	if op != code.OpAdd {
+		return fmt.Errorf("unknown string operator: %d", op)
+	}
+
+	leftValue := left.(*object.String).Value
+	rightValue := right.(*object.String).Value
+
+	return vm.push(&object.String{Value: leftValue + rightValue})
 }
 
 func (vm *VM) executeComparison(op code.OpCode) error {
