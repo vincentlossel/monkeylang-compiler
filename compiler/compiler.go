@@ -16,8 +16,7 @@ type CompilationScope struct {
 }
 
 type Compiler struct {
-	instructions code.Instructions
-	constants    []object.Object
+	constants []object.Object
 
 	symbolTable *SymbolTable
 
@@ -44,8 +43,7 @@ func New() *Compiler {
 	}
 
 	return &Compiler{
-		instructions: code.Instructions{},
-		constants:    []object.Object{},
+		constants: []object.Object{},
 
 		symbolTable: symbolTable,
 
@@ -184,10 +182,6 @@ func (c *Compiler) Compile(node ast.Node) error {
 			err := c.Compile(s)
 			if err != nil {
 				return err
-			}
-
-			if c.lastInstructionIs(code.OpPop) {
-				c.removeLastPop()
 			}
 		}
 
@@ -381,6 +375,8 @@ func (c *Compiler) lastInstructionIs(op code.OpCode) bool {
 	if len(c.currentInstructions()) == 0 {
 		return false
 	}
+
+	fmt.Printf("op: %+v\n", op)
 
 	return c.scopes[c.scopeIndex].lastInstruction.OpCode == op
 }
