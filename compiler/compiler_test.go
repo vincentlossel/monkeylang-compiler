@@ -508,9 +508,9 @@ func TestFunctionCalls(t *testing.T) {
 		},
 		{
 			input: `
-            let noArg = fn() { 24 };
-            noArg();
-            `,
+			let noArg = fn() { 24 };
+			noArg();
+			`,
 			expectedConstants: []interface{}{
 				24,
 				[]code.Instructions{
@@ -528,13 +528,13 @@ func TestFunctionCalls(t *testing.T) {
 		},
 		{
 			input: `
-            let oneArg = fn(a) { a };
-            oneArg(24);
-            `,
+			let oneArg = fn(a) { a };
+			oneArg(24);
+			`,
 			expectedConstants: []interface{}{
 				[]code.Instructions{
 					code.Make(code.OpGetLocal, 0),
-					code.Make(code.OpReturn),
+					code.Make(code.OpReturnValue),
 				},
 				24,
 			},
@@ -549,9 +549,9 @@ func TestFunctionCalls(t *testing.T) {
 		},
 		{
 			input: `
-            let manyArg = fn(a, b, c) { a; b; c; };
-            manyArg(24, 25, 26);
-            `,
+			let manyArg = fn(a, b, c) { a; b; c };
+			manyArg(24, 25, 26);
+			`,
 			expectedConstants: []interface{}{
 				[]code.Instructions{
 					code.Make(code.OpGetLocal, 0),
@@ -643,9 +643,9 @@ func TestLetStatementScopes(t *testing.T) {
 	tests := []compilerTestCase{
 		{
 			input: `
-            let num = 55;
-            fn() { num }
-            `,
+			let num = 55;
+			fn() { num }
+			`,
 			expectedConstants: []interface{}{
 				55,
 				[]code.Instructions{
@@ -662,11 +662,11 @@ func TestLetStatementScopes(t *testing.T) {
 		},
 		{
 			input: `
-            fn() {
-                let num = 55;
-                num
-            }
-            `,
+			fn() {
+				let num = 55;
+				num
+			}
+			`,
 			expectedConstants: []interface{}{
 				55,
 				[]code.Instructions{
@@ -683,14 +683,15 @@ func TestLetStatementScopes(t *testing.T) {
 		},
 		{
 			input: `
-            fn() {
-                let a = 55;
-                let b = 77;
-                a + b
-            }
-            `,
+			fn() {
+				let a = 55;
+				let b = 77;
+				a + b
+			}
+			`,
 			expectedConstants: []interface{}{
 				55,
+				77,
 				[]code.Instructions{
 					code.Make(code.OpConstant, 0),
 					code.Make(code.OpSetLocal, 0),
@@ -938,7 +939,7 @@ func TestRecursiveFunctions(t *testing.T) {
 				code.Make(code.OpClosure, 3, 0),
 				code.Make(code.OpSetGlobal, 0),
 				code.Make(code.OpGetGlobal, 0),
-				code.Make(code.OpCall, 1),
+				code.Make(code.OpCall, 0),
 				code.Make(code.OpPop),
 			},
 		},

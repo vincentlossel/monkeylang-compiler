@@ -131,8 +131,8 @@ func TestResolveNestedLocal(t *testing.T) {
 			[]Symbol{
 				Symbol{Name: "a", Scope: GlobalScope, Index: 0},
 				Symbol{Name: "b", Scope: GlobalScope, Index: 1},
-				Symbol{Name: "c", Scope: LocalScope, Index: 0},
-				Symbol{Name: "d", Scope: LocalScope, Index: 1},
+				Symbol{Name: "e", Scope: LocalScope, Index: 0},
+				Symbol{Name: "f", Scope: LocalScope, Index: 1},
 			},
 		},
 	}
@@ -222,8 +222,8 @@ func TestResolveFree(t *testing.T) {
 				Symbol{Name: "f", Scope: LocalScope, Index: 1},
 			},
 			[]Symbol{
-				Symbol{Name: "c", Scope: FreeScope, Index: 0},
-				Symbol{Name: "d", Scope: FreeScope, Index: 1},
+				Symbol{Name: "c", Scope: LocalScope, Index: 0},
+				Symbol{Name: "d", Scope: LocalScope, Index: 1},
 			},
 		},
 	}
@@ -257,11 +257,9 @@ func TestResolveFree(t *testing.T) {
 func TestResolveUnresolvableFree(t *testing.T) {
 	global := NewSymbolTable()
 	global.Define("a")
-	global.Define("b")
 
 	firstLocal := NewEnclosedSymbolTable(global)
 	firstLocal.Define("c")
-	firstLocal.Define("d")
 
 	secondLocal := NewEnclosedSymbolTable(firstLocal)
 	secondLocal.Define("e")
