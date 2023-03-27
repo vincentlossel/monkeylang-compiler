@@ -44,7 +44,7 @@ func main() {
 		comp := compiler.New()
 		err := comp.Compile(program)
 		if err != nil {
-			fmt.Printf("compiler error: %s")
+			fmt.Printf("compiler error: %s", err)
 			return
 		}
 
